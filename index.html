@@ -1,35 +1,37 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>云字典查看器</title>
-    <style>
-        body { font-family: Arial; max-width: 800px; margin: 20px auto; padding: 0 20px; }
-        .dict-item { margin: 10px 0; padding: 10px; border: 1px solid #eee; border-radius: 5px; }
-        .dict-key { font-weight: bold; color: #2c3e50; }
-        .dict-value { color: #3498db; margin-left: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>云字典</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial; }
+    body { max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { color: #2c3e50; margin-bottom: 2rem; }
+    .dict-item { padding: 1rem; border: 1px solid #eee; border-radius: 8px; margin: 1rem 0; }
+    .dict-key { font-weight: bold; font-size: 1.1rem; color: #3498db; }
+    .dict-value { margin-left: 1rem; color: #666; }
+  </style>
 </head>
 <body>
-    <h1>云字典内容</h1>
-    <div id="dict-container"></div>
+  <h1>云字典内容</h1>
+  <div id="dict-container"></div>
 
-    <script>
-        // 加载JSON字典并展示
-        fetch('./dict.json')
-            .then(res => res.json())
-            .then(dict => {
-                const container = document.getElementById('dict-container');
-                for (const [key, value] of Object.entries(dict)) {
-                    const item = document.createElement('div');
-                    item.className = 'dict-item';
-                    // 格式化显示值（处理数组/对象）
-                    const valueStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : value;
-                    item.innerHTML = `<span class="dict-key">${key}:</span> <span class="dict-value">${valueStr}</span>`;
-                    container.appendChild(item);
-                }
-            })
-            .catch(err => console.error('加载字典失败：', err));
-    </script>
+  <script>
+    // 加载本地dict.json，部署后自动适配云端路径
+    fetch('./dict.json')
+      .then(res => res.json())
+      .then(dict => {
+        const container = document.getElementById('dict-container');
+        for (const [key, value] of Object.entries(dict)) {
+          const item = document.createElement('div');
+          item.className = 'dict-item';
+          // 格式化数组/对象，更易读
+          const valueStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : value;
+          item.innerHTML = `<span class="dict-key">${key}:</span><pre class="dict-value">${valueStr}</pre>`;
+          container.appendChild(item);
+        }
+      })
+      .catch(err => alert('加载云字典失败：' + err.message));
+  </script>
 </body>
 </html>
