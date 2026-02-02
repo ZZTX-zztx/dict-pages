@@ -1,105 +1,134 @@
-// 配置后端API地址（后续绑定你的自定义域名，当前先用Worker原始域名测试）
-const API_BASE_URL = "https://dict-pages.3809026566.workers.dev"; // 替换为你的Worker原始域名
+// Cloudflare Worker 服务端代码（无任何前端DOM逻辑）
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const KV = env.CLOUD_DICT_KV; // 绑定的KV命名空间（ID：62fce0fa428b4eb7a6ded0fc9f845086）
 
-// DOM元素
-const keyInput = document.getElementById("key");
-const valueInput = document.getElementById("value");
-const btnSet = document.getElementById("btn-set");
-const btnDelete = document.getElementById("btn-delete");
-const btnGet = document.getElementById("btn-get");
-const resultPre = document.getElementById("result");
-
-// 工具函数：格式化JSON显示
-function formatJson(jsonStr) {
-    try {
-        return JSON.stringify(JSON.parse(jsonStr), null, 2);
-    } catch (e) {
-        return jsonStr;
-    }
-}
-
-// 工具函数：显示结果
-function showResult(content, isError = false) {
-    resultPre.textContent = content;
-    resultPre.className = isError ? "error" : "success";
-}
-
-// 写入/修改KV
-btnSet.addEventListener("click", async () => {
-    const key = keyInput.value.trim();
-    const value = valueInput.value.trim();
-
-    if (!key) {
-        showResult("错误：Key不能为空！", true);
-        return;
-    }
-
-    // 尝试解析Value（支持JSON格式）
-    let parsedValue;
-    try {
-        parsedValue = JSON.parse(value);
-    } catch (e) {
-        parsedValue = value; // 非JSON格式直接作为字符串
-    }
-
-    try {
-        showResult("正在写入...");
-        const response = await fetch(`${API_BASE_URL}/set`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ key, value: parsedValue }),
-        });
-
-        const data = await response.json();
-        if (data.code === 0) {
-            showResult(`写入成功！\n当前字典：\n${formatJson(JSON.stringify(data.data))}`);
-        } else {
-            showResult(`写入失败：${data.msg}`, true);
+    // 处理OPTIONS预检请求（解决跨域）
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
         }
-    } catch (e) {
-        showResult(`网络错误：${e.message}`, true);
-    }
-});
-
-// 删除KV
-btnDelete.addEventListener("click", async () => {
-    const key = keyInput.value.trim();
-    if (!key) {
-        showResult("错误：请输入要删除的Key！", true);
-        return;
+      });
     }
 
-    try {
-        showResult("正在删除...");
-        const response = await fetch(`${API_BASE_URL}/delete`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ key }),
-        });
-
-        const data = await response.json();
-        if (data.code === 0) {
-            showResult(`删除成功！\n当前字典：\n${formatJson(JSON.stringify(data.data))}`);
-        } else {
-            showResult(`删除失败：${data.msg}`, true);
+    // 1. 读取所有字典数据（GET /get）
+    if (path === '/get' && request.method === 'GET') {
+      const dictStr = await KV.get('cloud_dict') || '{}';
+      return new Response(dictStr, {
+        headers: {
+          'Content-Type': 'application/json;charset=utf-8',
+          'Access-Control-Allow-Origin': '*'
         }
-    } catch (e) {
-        showResult(`网络错误：${e.message}`, true);
+      });
     }
-});
 
-// 查看所有KV
-btnGet.addEventListener("click", async () => {
-    try {
-        showResult("正在读取...");
-        const response = await fetch(`${API_BASE_URL}/get`);
-        const data = await response.json();
-        showResult(`当前云字典：\n${formatJson(JSON.stringify(data))}`);
-    } catch (e) {
-        showResult(`读取失败：${e.message}`, true);
+    // 2. 写入/修改字典项（POST /set）
+    if (path === '/set' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const { key, value } = body;
+        
+        if (!key || value === undefined) {
+          return new Response(JSON.stringify({ code: -1, msg: '缺少key或value' }), {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json;charset=utf-8',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+
+        // 读取现有字典 → 修改 → 存回KV
+        const dictStr = await KV.get('cloud_dict') || '{}';
+        const dict = JSON.parse(dictStr);
+        dict[key] = value;
+        await KV.put('cloud_dict', JSON.stringify(dict, null, 2));
+
+        return new Response(JSON.stringify({ 
+          code: 0, 
+          msg: '修改成功', 
+          data: dict 
+        }), {
+          headers: {
+            'Content-Type': 'application/json;charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ 
+          code: -1, 
+          msg: `操作失败：${e.message}` 
+        }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json;charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
     }
-});
+
+    // 3. 删除字典项（POST /delete）
+    if (path === '/delete' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const { key } = body;
+        
+        if (!key) {
+          return new Response(JSON.stringify({ code: -1, msg: '缺少key' }), {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json;charset=utf-8',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+
+        const dictStr = await KV.get('cloud_dict') || '{}';
+        const dict = JSON.parse(dictStr);
+        delete dict[key];
+        await KV.put('cloud_dict', JSON.stringify(dict, null, 2));
+
+        return new Response(JSON.stringify({ 
+          code: 0, 
+          msg: '删除成功', 
+          data: dict 
+        }), {
+          headers: {
+            'Content-Type': 'application/json;charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ 
+          code: -1, 
+          msg: `操作失败：${e.message}` 
+        }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json;charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    }
+
+    // 默认返回API说明
+    return new Response(`
+      云字典API使用说明：
+      1. 读取字典：GET /get
+      2. 写入/修改：POST /set → {"key":"xxx","value":"xxx"}
+      3. 删除项：POST /delete → {"key":"xxx"}
+    `, {
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
+  }
+};
