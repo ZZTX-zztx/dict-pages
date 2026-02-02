@@ -1,37 +1,57 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <title>云字典</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial; }
-    body { max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { color: #2c3e50; margin-bottom: 2rem; }
-    .dict-item { padding: 1rem; border: 1px solid #eee; border-radius: 8px; margin: 1rem 0; }
-    .dict-key { font-weight: bold; font-size: 1.1rem; color: #3498db; }
-    .dict-value { margin-left: 1rem; color: #666; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云字典管理（zztxtkintel.dpdns.org）</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        .container { background: #f8f9fa; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { color: #2d3748; text-align: center; margin-bottom: 2rem; }
+        .input-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #4a5568; font-weight: 500; }
+        input, textarea { width: 100%; padding: 0.8rem; border: 1px solid #dee2e6; border-radius: 6px; font-size: 1rem; }
+        textarea { min-height: 100px; resize: vertical; }
+        .btn-group { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        button { flex: 1; padding: 0.8rem; border: none; border-radius: 6px; font-size: 1rem; font-weight: 500; cursor: pointer; }
+        #btn-set { background: #4299e1; color: white; }
+        #btn-delete { background: #e53e3e; color: white; }
+        #btn-get { background: #48bb78; color: white; }
+        .result { background: white; padding: 1rem; border-radius: 6px; border: 1px solid #dee2e6; max-height: 300px; overflow-y: auto; }
+        pre { color: #2d3748; font-size: 0.95rem; }
+        .error { color: #e53e3e; }
+        .success { color: #48bb78; }
+    </style>
 </head>
 <body>
-  <h1>云字典内容</h1>
-  <div id="dict-container"></div>
+    <div class="container">
+        <h1>云字典管理</h1>
+        
+        <div class="input-group">
+            <label for="key">字典Key：</label>
+            <input type="text" id="key" placeholder="请输入要操作的Key（如name、age）">
+        </div>
 
-  <script>
-    // 加载本地dict.json，部署后自动适配云端路径
-    fetch('./dict.json')
-      .then(res => res.json())
-      .then(dict => {
-        const container = document.getElementById('dict-container');
-        for (const [key, value] of Object.entries(dict)) {
-          const item = document.createElement('div');
-          item.className = 'dict-item';
-          // 格式化数组/对象，更易读
-          const valueStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : value;
-          item.innerHTML = `<span class="dict-key">${key}:</span><pre class="dict-value">${valueStr}</pre>`;
-          container.appendChild(item);
-        }
-      })
-      .catch(err => alert('加载云字典失败：' + err.message));
-  </script>
+        <div class="input-group">
+            <label for="value">字典Value：</label>
+            <textarea id="value" placeholder="请输入Value（支持字符串、数字、JSON数组/对象，如：张三、25、[1,2,3]、{&quot;sub&quot;:&quot;test&quot;}）"></textarea>
+        </div>
+
+        <div class="btn-group">
+            <button id="btn-set">写入/修改</button>
+            <button id="btn-delete">删除</button>
+            <button id="btn-get">查看所有</button>
+        </div>
+
+        <div class="input-group">
+            <label>操作结果：</label>
+            <div class="result">
+                <pre id="result">请点击按钮执行操作...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
 </body>
 </html>
