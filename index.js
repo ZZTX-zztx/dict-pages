@@ -1,87 +1,74 @@
-// index.js 完整跨域配置（替换原有跨域代码）
+// index.js（终极跨域版，无任何遗漏）
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    const path = url.pathname;
-    const KV = env.CLOUD_DICT_KV;
+    // 1. 全局跨域头（所有响应都加）
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+      "Access-Control-Max-Age": "600",
+      "Content-Type": "application/json;charset=utf-8"
+    };
 
-    // ========== 完整跨域配置（解决Failed to fetch核心） ==========
-    // 1. 处理所有OPTIONS预检请求
+    // 2. 处理所有OPTIONS预检请求（直接返回204）
     if (request.method === "OPTIONS") {
       return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*", // 允许所有域名跨域（GitHub Pages适配）
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS", // 允许的方法
-          "Access-Control-Allow-Headers": "Content-Type, Origin, X-Requested-With", // 允许的请求头
-          "Access-Control-Max-Age": "86400" // 预检请求缓存1天，减少请求
-        }
+        status: 204,
+        headers: corsHeaders
       });
     }
 
-    // 2. 给所有响应添加跨域头
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Origin, X-Requested-With"
-    };
+    try {
+      const url = new URL(request.url);
+      const path = url.pathname;
+      const KV = env.CLOUD_DICT_KV;
 
-    // ========== 原有业务逻辑（追加写入接口） ==========
-    if (path === '/append' && request.method === 'POST') {
-      try {
-        const { key, value } = await request.json();
+      // 3. 追加写入接口（核心）
+      if (path === '/append' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({})); // 兼容空请求体
+        const { key, value } = body;
+        
         if (!key || value === undefined) {
           return new Response(JSON.stringify({
             code: -1,
             msg: "Key和Value不能为空！"
-          }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json;charset=utf-8' }
-          });
+          }), { status: 400, headers: corsHeaders });
         }
 
-        const oldDictStr = await KV.get('cloud_dict') || '{}';
-        const oldDict = JSON.parse(oldDictStr);
+        // KV操作逻辑（极简版，减少报错）
+        const oldDict = JSON.parse(await KV.get('cloud_dict') || '{}');
         oldDict[key] = value;
-        await KV.put('cloud_dict', JSON.stringify(oldDict, null, 2));
+        await KV.put('cloud_dict', JSON.stringify(oldDict));
 
         return new Response(JSON.stringify({
           code: 0,
-          msg: `成功写入云字典！新增/更新：${key} = ${value}`,
+          msg: `写入成功：${key}=${value}`,
           dict: oldDict
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json;charset=utf-8' }
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({
-          code: -1,
-          msg: `写入失败：${e.message}`
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json;charset=utf-8' }
-        });
+        }), { headers: corsHeaders });
       }
-    }
 
-    // 读取字典接口（也加跨域头）
-    if (path === '/getDict' && request.method === 'GET') {
-      const dictStr = await KV.get('cloud_dict') || '{}';
-      const dict = JSON.parse(dictStr);
+      // 4. 读取接口
+      if (path === '/getDict' && request.method === 'GET') {
+        const dict = JSON.parse(await KV.get('cloud_dict') || '{}');
+        return new Response(JSON.stringify({
+          code: 0,
+          dict: dict
+        }), { headers: corsHeaders });
+      }
+
+      // 5. 兜底响应
       return new Response(JSON.stringify({
-        code: 0,
-        msg: "读取成功",
-        dict: dict
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json;charset=utf-8' }
-      });
-    }
+        code: -2,
+        msg: "接口不存在，仅支持 /append(POST) 和 /getDict(GET)"
+      }), { status: 404, headers: corsHeaders });
 
-    // 默认响应（加跨域头）
-    return new Response(`
-      云字典API使用说明：
-      1. 追加写入：POST /append → {"key":"xxx","value":"xxx"}
-      2. 读取字典：GET /getDict
-    `, {
-      headers: { ...corsHeaders, 'Content-Type': 'text/plain;charset=utf-8' }
-    });
+    } catch (e) {
+      // 6. 捕获所有异常（返回具体错误）
+      return new Response(JSON.stringify({
+        code: -1,
+        msg: `Worker内部错误：${e.message}`,
+        stack: e.stack || '' // 调试用，上线可删除
+      }), { status: 500, headers: corsHeaders });
+    }
   }
 };
