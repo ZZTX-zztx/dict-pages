@@ -4,9 +4,9 @@
   "main": "index.js",
   "kv_namespaces": [
     {
-      "binding": "CLOUD_DICT_KV", // 代码中通过 env.CLOUD_DICT_KV 访问该KV
-      "id": "62fce0fa428b4eb7a6ded0fc9f845086", // 你的KV命名空间ID
-      "preview_id": "62fce0fa428b4eb7a6ded0fc9f845086" // 预览环境也用同一个ID
+      "binding": "CLOUD_DICT_KV",
+      "id": "62fce0fa428b4eb7a6ded0fc9f845086",
+      "preview_id": "62fce0fa428b4eb7a6ded0fc9f845086"
     }
   ]
 }
