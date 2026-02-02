@@ -1,12 +1,16 @@
 {
-  "name": "dict-pages",
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dict-pages", // 改为你的Worker名称（和之前一致）
+  "main": "index.js", // 修正：代码是index.js，不是src/index.ts
   "compatibility_date": "2026-02-02",
-  "main": "index.js",
+  "observability": {
+    "enabled": true
+  },
   "kv_namespaces": [
     {
-      "binding": "手机号",
-      "id": "62fce0fa428b4eb7a6ded0fc9f845086",
-      "preview_id": "62fce0fa428b4eb7a6ded0fc9f845086"
+      "binding": "手机号", // 和代码中的env.KV对应
+      "id": "62fce0fa428b4eb7a6ded0fc9f845086", // 你的KV ID
+      "preview_id": "62fce0fa428b4eb7a6ded0fc9f845086" // 去掉占位符，和id一致
     }
   ]
 }
