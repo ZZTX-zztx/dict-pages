@@ -1,0 +1,8 @@
+{
+  "name": "测试字典",
+  "data": {
+    "key1": "value1",
+    "key2": "value2",
+    "key3": ["v3a", "v3b"]
+  }
+}
