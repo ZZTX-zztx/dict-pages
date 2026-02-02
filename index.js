@@ -1,11 +1,11 @@
-// Cloudflare Worker 服务端代码（无任何前端DOM逻辑）
+// index.js（支持追加写入云字典）
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-    const KV = env.CLOUD_DICT_KV; // 绑定的KV命名空间（ID：62fce0fa428b4eb7a6ded0fc9f845086）
+    const KV = env.CLOUD_DICT_KV; // 你的KV命名空间
 
-    // 处理OPTIONS预检请求（解决跨域）
+    // 跨域预检处理
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -16,10 +16,67 @@ export default {
       });
     }
 
-    // 1. 读取所有字典数据（GET /get）
-    if (path === '/get' && request.method === 'GET') {
+    // 1. 追加写入云字典（核心接口）
+    if (path === '/append' && request.method === 'POST') {
+      try {
+        // 接收前端传入的key和value
+        const { key, value } = await request.json();
+        if (!key || value === undefined) {
+          return new Response(JSON.stringify({
+            code: -1,
+            msg: "Key和Value不能为空！"
+          }), {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json;charset=utf-8',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+
+        // 读取现有云字典（无则初始化空对象）
+        const oldDictStr = await KV.get('cloud_dict') || '{}';
+        const oldDict = JSON.parse(oldDictStr);
+        
+        // 追加/覆盖Key-Value（核心：追加逻辑）
+        oldDict[key] = value;
+        
+        // 存回KV（格式化JSON，便于查看）
+        await KV.put('cloud_dict', JSON.stringify(oldDict, null, 2));
+
+        return new Response(JSON.stringify({
+          code: 0,
+          msg: `成功写入云字典！新增/更新：${key} = ${value}`,
+          dict: oldDict // 返回最新完整字典
+        }), {
+          headers: {
+            'Content-Type': 'application/json;charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({
+          code: -1,
+          msg: `写入失败：${e.message}`
+        }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json;charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    }
+
+    // 2. 读取完整云字典
+    if (path === '/getDict' && request.method === 'GET') {
       const dictStr = await KV.get('cloud_dict') || '{}';
-      return new Response(dictStr, {
+      const dict = JSON.parse(dictStr);
+      return new Response(JSON.stringify({
+        code: 0,
+        msg: "读取成功",
+        dict: dict
+      }), {
         headers: {
           'Content-Type': 'application/json;charset=utf-8',
           'Access-Control-Allow-Origin': '*'
@@ -27,103 +84,11 @@ export default {
       });
     }
 
-    // 2. 写入/修改字典项（POST /set）
-    if (path === '/set' && request.method === 'POST') {
-      try {
-        const body = await request.json();
-        const { key, value } = body;
-        
-        if (!key || value === undefined) {
-          return new Response(JSON.stringify({ code: -1, msg: '缺少key或value' }), {
-            status: 400,
-            headers: {
-              'Content-Type': 'application/json;charset=utf-8',
-              'Access-Control-Allow-Origin': '*'
-            }
-          });
-        }
-
-        // 读取现有字典 → 修改 → 存回KV
-        const dictStr = await KV.get('cloud_dict') || '{}';
-        const dict = JSON.parse(dictStr);
-        dict[key] = value;
-        await KV.put('cloud_dict', JSON.stringify(dict, null, 2));
-
-        return new Response(JSON.stringify({ 
-          code: 0, 
-          msg: '修改成功', 
-          data: dict 
-        }), {
-          headers: {
-            'Content-Type': 'application/json;charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({ 
-          code: -1, 
-          msg: `操作失败：${e.message}` 
-        }), {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json;charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
-      }
-    }
-
-    // 3. 删除字典项（POST /delete）
-    if (path === '/delete' && request.method === 'POST') {
-      try {
-        const body = await request.json();
-        const { key } = body;
-        
-        if (!key) {
-          return new Response(JSON.stringify({ code: -1, msg: '缺少key' }), {
-            status: 400,
-            headers: {
-              'Content-Type': 'application/json;charset=utf-8',
-              'Access-Control-Allow-Origin': '*'
-            }
-          });
-        }
-
-        const dictStr = await KV.get('cloud_dict') || '{}';
-        const dict = JSON.parse(dictStr);
-        delete dict[key];
-        await KV.put('cloud_dict', JSON.stringify(dict, null, 2));
-
-        return new Response(JSON.stringify({ 
-          code: 0, 
-          msg: '删除成功', 
-          data: dict 
-        }), {
-          headers: {
-            'Content-Type': 'application/json;charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({ 
-          code: -1, 
-          msg: `操作失败：${e.message}` 
-        }), {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json;charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
-      }
-    }
-
-    // 默认返回API说明
+    // 默认返回说明
     return new Response(`
-      云字典API使用说明：
-      1. 读取字典：GET /get
-      2. 写入/修改：POST /set → {"key":"xxx","value":"xxx"}
-      3. 删除项：POST /delete → {"key":"xxx"}
+      云字典追加写入API：
+      1. 追加写入：POST /append → {"key":"手机号","value":"13800138000"}
+      2. 读取字典：GET /getDict
     `, {
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
