@@ -6,6 +6,9 @@
   "observability": {
     "enabled": true
   },
+  "assets": {
+    "directory": "./"
+  },
   "kv_namespaces": [
     {
       "binding": "手机号", // 和代码中的env.KV对应
